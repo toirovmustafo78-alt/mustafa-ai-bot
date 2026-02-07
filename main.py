@@ -1,6 +1,6 @@
 import os
 import google.generativeai as genai
-from telegram import Update
+
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
 # ENV variables (Render ichida qo'yiladi)
@@ -47,3 +47,4 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 app.run_polling()
+
