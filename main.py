@@ -1,50 +1,62 @@
 import os
 import google.generativeai as genai
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+# --- Sozlamalar ---
+# Render.com saytidagi "Environment" bo'limiga o'ting va
+# TELEGRAM_TOKEN hamda GOOGLE_API_KEY o'zgaruvchilarini qo'shing.
+try:
+    TELEGRAM_TOKEN = os.environ['8463275951:AAE8QX6ZNAF1DCq-mvNHHllGVeMcdiScydo']
+    GOOGLE_API_KEY = os.environ['AIzaSyBCFLJZTlnZEC98ieLmscKhsvcpG7VpBFs']
+except KeyError:
+    print("Xatolik: Muhit o'zgaruvchilari (Environment Variables) topilmadi!")
+    print("Render.com da TELEGRAM_TOKEN va GOOGLE_API_KEY ni sozlaganingizga ishonch hosil qiling.")
+    exit()
 
-# ENV variables (Render ichida qo'yiladi)
-TELEGRAM_TOKEN = os.getenv("8463275951:AAE8QX6ZNAF1DCq-mvNHHllGVeMcdiScydo")
-GEMINI_API_KEY = os.getenv("AIzaSyBCFLJZTlnZEC98ieLmscKhsvcpG7VpBFs")
+# Google AI ni sozlash
+genai.configure(api_key=GOOGLE_API_KEY)
+model = genai.GenerativeModel('gemini-pro')
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
+# --- Funksiyalar ---
 
-SYSTEM_PROMPT = """
-Sen MUSTAFA.AI nomli yordamchisan.
-Sen o'zingni sun'iy intellekt deb aytma.
-1–11 sinf O‘zbekiston maktab darsliklari uslubida tushuntir.
-Har doim:
-- Berilgan
-- Formula
-- Yechim
-- Javob
-ko‘rinishida yoz.
-Geometriyada ASCII sxema bilan ko‘rsat.
-"""
+# /start buyrug'i uchun javob
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.message.from_user.first_name
+    await update.message.reply_text(
+        f"Assalomu alaykum, {user_name}!\n\n"
+        f"Men MUSTAFA.AI men. "
+        f"Menga istalgan savolingizni yozishingiz mumkin."
+    )
 
-INTRO_TEXT = (
-    "Salom 👋\n"
-    "Men MUSTAFA.AI man.\n\n"
-    "Meni ushbu inson yaratgan:\n"
-    "Muhammed Mustafa\n"
-    "Instagram 👉 https://instagram.com/muhammed.mystafa\n\n"
-    "1–11 sinf fanlaridan masalalarni tushuntirib yechib beraman."
-)
-
+# Oddiy matnli xabarlar uchun javob
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.lower()
+    user_message = update.message.text
+    
+    # Foydalanuvchiga "yozmoqda..." statusini ko'rsatish
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action='typing')
+    
+    try:
+        # Gemini AI ga so'rov yuborish
+        response = model.generate_content(user_message)
+        await update.message.reply_text(response.text)
+    except Exception as e:
+        print(f"Xatolik yuz berdi: {e}")
+        await update.message.reply_text(
+            "Kechirasiz, hozirda savolingizga javob bera olmayman. "
+            "Iltimos, birozdan so'ng qayta urinib ko'ring."
+        )
 
-    if text in ["salom", "assalomu alaykum", "hello"]:
-        await update.message.reply_text(INTRO_TEXT)
-        return
+# --- Botni ishga tushirish ---
+def main():
+    print("Bot ishga tushirilmoqda...")
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print("Bot muvaffaqiyatli ishga tushdi va xabarlarni kutmoqda.")
+    application.run_polling()
 
-    prompt = SYSTEM_PROMPT + "\nSavol: " + update.message.text
-    response = model.generate_content(prompt)
-
-    await update.message.reply_text(response.text)
-
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-app.run_polling()
-
+if __name__ == '__main__':
+    main()
